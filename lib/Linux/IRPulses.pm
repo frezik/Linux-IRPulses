@@ -11,10 +11,11 @@ use constant DEBUG => 0;
 # ABSTRACT: Parse LIRC pulse data
 
 Moose::Exporter->setup_import_methods(
-    as_is => [ 'pulse', 'space', ],
+    as_is => [ 'pulse', 'space', 'pulse_or_space' ],
 );
 sub pulse ($) {[ 'pulse', $_[0] ]}
 sub space ($) {[ 'space', $_[0] ]}
+sub pulse_or_space ($) {[ 'either', $_[0] ]}
 
 
 has 'fh' => (
@@ -292,6 +293,7 @@ sub _match_line
     my ($expect_type, $expect_num) = @{ $expect };
     warn "\tMatching '$line', expecting '$expect_type $expect_num'\n" if DEBUG;
     my ($type, $num) = $line =~ /\A (pulse|space) \s+ (\d+) /x;
+    $expect_type = $type if $expect_type eq 'either';
 
     return (
         $self->_is_value_in_range( $num, $expect_num )

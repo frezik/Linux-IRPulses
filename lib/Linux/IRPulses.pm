@@ -317,3 +317,156 @@ __PACKAGE__->meta->make_immutable;
 1;
 __END__
 
+
+=encoding utf8
+
+=head1 NAME
+
+  Linux::IRPulses - Parse IR data from LIRC
+
+=head1 SYNOPSIS
+
+  use Linux::IRPulses; # exports pulse(), space(), and pulse_or_space()
+  
+  open( my $in, '-|', 'mode2' ) or die "Can't exec mode2: $!\n";
+  
+  my $ir = Linux::IRPulses->new({
+      fh => $in,
+      header => [ pulse 9000, space 4500 ],
+      zero => [ pulse 563, space 563 ],
+      one => [ pulse 563, space 1688 ],
+      bit_count => 32,
+      callback => sub {
+          my ($args) = @_;
+          my $ir = $args->{pulse_obj};
+          my $code = $args->{code};
+          ...
+      },
+  });
+  $ir->run;
+
+=head1 DESCRIPTION
+
+Parses the pulse/space data coming from LIRC. Note that this works at a little lower 
+level down the LIRC stack than usual. LIRC usually works by translating the pulses on 
+its own, mapping that to a button on a remote, and then mapping that to a command to 
+execute. If you want that, then look at L<Lirc::Client>.
+
+This module grabs the pulse data coming out of LIRC and then translates that to binary. 
+That lets you manipulate the raw encoding.
+
+=head1 HOW IR REMOTES WORK
+
+Perhaps not surprisingly, every company has their own weird way of encoding IR data. 
+This usually breaks down to sending a header followed by zeros and ones that are 
+encoded through sending pulses of different lengths. Everyone also has their own 
+frequency for sending data, although 36KHz is common. Your IR receiver module needs 
+to be set to the same frequency.
+
+The length for encoding pulses has to deal with the fact that in the real world, 
+the IR emitter and receiver won't shut off at exactly the right time. The pulse will 
+tend to be a bit longer than specified; I've seen as high as 18%. Parsing must therefore 
+allow a fudge factor in the exact numbers.
+
+=head1 EXPORTS
+
+The exports are to help you build a datastructure that the parser can use. In general, 
+remotes tend to start with a long header, then a space, then a series of pulses and 
+spaces.
+
+For example, NEC remotes start with a header that pulses (voltage high) for 9000μs, 
+followed by a space (voltage low) for 4500μs. After that, there are 32 bits. A zero is 
+sent by a pulse of 563μs followed by a space of 563μs. A one is sent by a pulse of 
+563μs followed by a space of 1688μs. We can build this in C<Linux::IRPulses> with:
+
+  my $ir = Linux::IRPulses->new({
+      header => [ pulse 9000, space 4500 ],
+      zero => [ pulse 563, space 563 ],
+      one => [ pulse 563, space 1688 ],
+      ...
+  });
+
+Notice that the C<pulse()> and C<space()> exports help you to specify the datastructure.
+
+Another example is EasyRaceLapTimer, which is an IR-based timing system for quadcopter 
+FPV racing. To save on message time length, it encodes by the time of either the 
+pulses or the spaces. For example, a 0110 would be sent by a pulse of 300μs, a space 
+of 600μs, a pulse of 600μs, and a space of 300μs. That is, spaces and pulses always 
+alternate, and the time of the space or pulse tells you if it's a one or zero.
+
+To handle this, we use C<pulse_or_space()>:
+
+  my $ir = Linux::IRPulses->new({
+      header => [ pulse 300, space 300 ],
+      zero => [ pulse_or_space 300 ],
+      one => [ pulse_or_space 600 ],
+      ...
+  });
+
+Which doesn't care if it comes across as a pulse or space, as long as the length is correct.
+
+=head1 METHODS
+
+=head2 new
+
+  new({
+      fh => $fh,
+      header => [ pulse 9000, space 4500 ],
+      zero => [ pulse 563, space 563 ],
+      one => [ pulse 563, space 1688 ],
+      bit_count => 32,
+      callback => sub {
+          my ($args) = @_;
+          my $ir = $args->{pulse_obj};
+          my $code = $args->{code};
+          ...
+      },
+  });
+
+Constructor.  The C<fh> argument is a filehandle that will be read for pulse data. In 
+general, this should be a filehandle open for reading that's piped from LIRC's C<mode2> 
+program. The C<bit_count> argument is the expected length of each message.
+
+The C<header>, C<zero>, and C<one> arguments are arrayrefs that specify the format of 
+the respective datapoint. The first data would match the first entry in C<header>, and 
+then matching each subsequent entry in turn. Once we reach the end of the C<headers> 
+list, we start matching C<zero> and C<one> in the same way. We continue matching 
+zeros and ones until we hit C<bit_count>. At that point, we consider the message complete 
+and pass the data to the subref in C<callback>.
+
+=head2 run
+
+Starts reading the data from the filehandle.  The callback will be hit during this 
+process.
+
+=head2 end
+
+Stops the process of reading from the filehandle, returning to normal execution flow 
+after the place C<run()> was called.
+
+=head1 LICENSE
+
+Copyright (c) 2016  Timm Murray
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are 
+permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, this list of 
+      conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, this list of
+      conditions and the following disclaimer in the documentation and/or other materials 
+      provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS 
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
+COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR 
+TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, 
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+=cut

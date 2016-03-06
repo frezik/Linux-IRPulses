@@ -159,11 +159,7 @@ sub run
         && (my $line = readline($in))
     ) {
         chomp $line;
-        my $full_code = $self->_handle_line( $line );
-        $self->callback->({
-            pulse_obj => $self,
-            code => $full_code,
-        }) if defined $full_code;
+        $self->handle_line( $line );
     }
 
     close $in if $self->_do_close_file;
@@ -178,7 +174,7 @@ sub end
 }
 
 
-sub _handle_line
+sub handle_line
 {
     my ($self, $line) = @_;
     warn "Matching: $line\n" if DEBUG;
@@ -438,6 +434,18 @@ and pass the data to the subref in C<callback>.
 
 Starts reading the data from the filehandle.  The callback will be hit during this 
 process.
+
+=head2 handle_line
+
+  handle_line( $line );
+
+Processes a single line of the forms:
+
+  pulse 1000
+  space 2000
+
+Hits the callback if we gathered enough lines to get a full code. Be sure to C<chomp> the 
+line before passing.
 
 =head2 end
 

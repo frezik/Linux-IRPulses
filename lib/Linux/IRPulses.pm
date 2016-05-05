@@ -20,7 +20,6 @@ sub pulse_or_space ($) {[ 'either', $_[0] ]}
 
 has 'fh' => (
     is => 'ro',
-    required => 1,
 );
 has 'header' => (
     traits => ['Array'],

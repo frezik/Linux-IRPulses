@@ -1,5 +1,10 @@
 Revision history for perl module UAV::Pilot
 
+0.7 2016-05-04
+
+- 'fh' parameter is no longer required, since handle_line() can be useful 
+  without it
+
 0.6 2016-03-06
 
 - Add handle_line()
